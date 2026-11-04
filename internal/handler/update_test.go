@@ -27,6 +27,18 @@ func (s *storageSpy) AddCounter(id string, delta int64) {
 	s.counterCalls++
 }
 
+func (s *storageSpy) GetGauge(id string) (float64, bool) {
+	return 0, false
+}
+
+func (s *storageSpy) GetCounter(id string) (int64, bool) {
+	return 0, false
+}
+
+func (s *storageSpy) GetAll() (map[string]float64, map[string]int64) {
+	return map[string]float64{}, map[string]int64{}
+}
+
 func TestUpdateHandler(t *testing.T) {
 	tests := []struct {
 		name        string
