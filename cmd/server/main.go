@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -9,6 +10,8 @@ import (
 )
 
 func main() {
+	serverURL := flag.String("a", "localhost:8080", "input server url")
+	flag.Parse()
 	r := chi.NewRouter()
 
 	storage := repository.NewMemStorage()
@@ -19,7 +22,7 @@ func main() {
 	r.Get("/value/{type}/{name}", handler.ValueHandler)
 	r.Get("/", handler.ListHandler)
 
-	err := http.ListenAndServe(":8080", r)
+	err := http.ListenAndServe(*serverURL, r)
 	if err != nil {
 		panic(err)
 	}
