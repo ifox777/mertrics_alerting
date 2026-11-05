@@ -10,7 +10,7 @@ func SendGauge(url string, name string, gauge float64) error {
 
 	resp, err := http.Post(path, "text/plain", nil)
 	if err != nil {
-		return fmt.Errorf("Error %w", err)
+		return fmt.Errorf("error %w", err)
 	}
 	fmt.Println(resp.StatusCode)
 
@@ -27,7 +27,7 @@ func SendCounter(url string, name string, counter int64) error {
 
 	resp, err := http.Post(path, "text/plain", nil)
 	if err != nil {
-		return fmt.Errorf("Error %w", err)
+		return fmt.Errorf("error %w", err)
 	}
 	fmt.Println(resp.StatusCode)
 	resp.Body.Close()
