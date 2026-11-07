@@ -10,13 +10,12 @@ func SendGauge(url string, name string, gauge float64) error {
 
 	resp, err := http.Post(path, "text/plain", nil)
 	if err != nil {
-		return fmt.Errorf("error %w", err)
+		return fmt.Errorf("send gauge %s to %s: %w", name, url, err)
 	}
-	fmt.Println(resp.StatusCode)
 
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%d", resp.StatusCode)
+		return fmt.Errorf("send gauge %s to %s: unexpected HTTP status %d", name, url, resp.StatusCode)
 	}
 
 	return nil
@@ -27,13 +26,11 @@ func SendCounter(url string, name string, counter int64) error {
 
 	resp, err := http.Post(path, "text/plain", nil)
 	if err != nil {
-		return fmt.Errorf("error %w", err)
+		return fmt.Errorf("send counter %s to %s: %w", name, url, err)
 	}
-	fmt.Println(resp.StatusCode)
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%d", resp.StatusCode)
+		return fmt.Errorf("send counter %s to %s: unexpected HTTP status %d", name, url, resp.StatusCode)
 	}
 	return nil
-
 }

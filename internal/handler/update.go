@@ -2,15 +2,10 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 )
 
 func (h *Handler) UpdateHandler(resp http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		http.Error(resp, "Incorrect method", http.StatusMethodNotAllowed)
-		return
-	}
 	parts := strings.Split(req.URL.Path, "/")
 	if len(parts) != 5 {
 		http.Error(resp, "Incorrect Path", http.StatusNotFound)
@@ -27,23 +22,8 @@ func (h *Handler) UpdateHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	switch parts[2] {
-	case "gauge":
-		gauge, err := strconv.ParseFloat(parts[4], 64)
-		if err != nil {
-			http.Error(resp, "Ivalid gauge", http.StatusBadRequest)
-			return
-		}
-		h.storage.SetGauge(parts[3], gauge)
-	case "counter":
-		counter, err := strconv.ParseInt(parts[4], 10, 64)
-		if err != nil {
-			http.Error(resp, "Invalid counter", http.StatusBadRequest)
-			return
-		}
-		h.storage.AddCounter(parts[3], counter)
-	default:
-		http.Error(resp, "Incorrect metric", http.StatusBadRequest)
+	if err := h.metrics.Update(parts[2], parts[3], parts[4]); err != nil {
+		http.Error(resp, err.Error(), http.StatusBadRequest)
 		return
 	}
 

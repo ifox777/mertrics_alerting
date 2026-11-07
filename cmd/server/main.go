@@ -11,15 +11,14 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/ifox777/metrics-alerting/internal/config"
 	"github.com/ifox777/metrics-alerting/internal/handler"
 	"github.com/ifox777/metrics-alerting/internal/repository"
+	"github.com/ifox777/metrics-alerting/internal/service"
 )
 
-func main() {
+func run(cfg config.ServerConfig) error {
 	var server http.Server
-
-	serverURL := flag.String("a", "localhost:8080", "input server url")
-	flag.Parse()
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -29,31 +28,57 @@ func main() {
 	r := chi.NewRouter()
 
 	storage := repository.NewMemStorage()
-
-	handler := handler.NewHandler(storage)
+	metrics := service.NewMetrics(storage)
+	handler := handler.NewHandler(metrics)
 
 	r.Post("/update/*", handler.UpdateHandler)
 	r.Get("/value/{type}/{name}", handler.ValueHandler)
 	r.Get("/", handler.ListHandler)
 
-	server.Addr = *serverURL
+	server.Addr = cfg.Address
 	server.Handler = r
+
+	serverErr := make(chan error, 1)
 
 	go func() {
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			panic(err)
+			serverErr <- err
 		}
 	}()
 
-	<-ctx.Done()
-	shutdownCtx, cancel := context.WithTimeout(
-		context.Background(),
-		5*time.Second,
-	)
-	defer cancel()
+	select {
+	case err := <-serverErr:
+		if err == http.ErrServerClosed {
+			return nil
+		}
+		return err
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("server shutdown: %v", err)
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancel()
+
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("server shutdown: %v", err)
+			return err
+		}
+		return nil
+	}
+}
+
+func main() {
+	cfg, err := config.ParseServer(os.Args[1:])
+	if err == flag.ErrHelp {
+		return
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := run(cfg); err != nil {
+		log.Fatal(err)
 	}
 }

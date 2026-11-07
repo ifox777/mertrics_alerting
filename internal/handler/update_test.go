@@ -4,6 +4,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/ifox777/metrics-alerting/internal/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,14 +68,16 @@ func TestUpdateHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			spy := &storageSpy{}
 
-			handler := NewHandler(spy)
+			handler := NewHandler(service.NewMetrics(spy))
+			router := chi.NewRouter()
+			router.Post("/update/*", handler.UpdateHandler)
 
 			request := httptest.NewRequest(tt.method, tt.path, nil)
 			request.Header.Set("Content-Type", "text/plain")
 
 			response := httptest.NewRecorder()
 
-			handler.UpdateHandler(response, request)
+			router.ServeHTTP(response, request)
 
 			assert.Equal(t, tt.code, response.Code)
 			assert.Equal(t, tt.wantStorage, *spy)

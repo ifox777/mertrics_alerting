@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ifox777/metrics-alerting/internal/repository"
+	"github.com/ifox777/metrics-alerting/internal/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +35,7 @@ func TestValueHandler(t *testing.T) {
 			storage.AddCounter("PollCount", 3)
 			storage.AddCounter("zero", 0)
 
-			h := NewHandler(storage)
+			h := NewHandler(service.NewMetrics(storage))
 
 			router := chi.NewRouter()
 			router.Get("/value/{type}/{name}", h.ValueHandler)

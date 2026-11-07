@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ifox777/metrics-alerting/internal/repository"
+	"github.com/ifox777/metrics-alerting/internal/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +56,7 @@ func TestListHandler(t *testing.T) {
 				storage.AddCounter(name, value)
 			}
 
-			h := NewHandler(storage)
+			h := NewHandler(service.NewMetrics(storage))
 			request := httptest.NewRequest(http.MethodGet, "/", nil)
 			response := httptest.NewRecorder()
 

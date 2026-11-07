@@ -2,24 +2,27 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"math/rand/v2"
+	"os"
 	"runtime"
 	"time"
 
 	"github.com/ifox777/metrics-alerting/internal/agent"
+	"github.com/ifox777/metrics-alerting/internal/config"
 )
 
 func main() {
 	var metric runtime.MemStats
 	var pollCount int64
 
-	agentURL := flag.String("a", "localhost:8080", "input agent url")
-	reportInterval := flag.Int("r", 10, "report interval")
-	pollInterval := flag.Int("p", 2, "poll interval")
-
-	flag.Parse()
+	cfg, err := config.ParseAgent(os.Args[1:])
+	if err == flag.ErrHelp {
+		return
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	lastReport := time.Now()
 
@@ -29,7 +32,7 @@ func main() {
 	var lastPoll time.Time
 
 	for {
-		if lastPoll.IsZero() || time.Since(lastPoll) >= time.Duration(*pollInterval)*time.Second {
+		if lastPoll.IsZero() || time.Since(lastPoll) >= cfg.PollInterval {
 			runtime.ReadMemStats(&metric)
 
 			metrics = map[string]float64{
@@ -66,15 +69,15 @@ func main() {
 			pollCount = pollCount + 1
 			lastPoll = time.Now()
 		}
-		if time.Since(lastReport) >= time.Duration(*reportInterval)*time.Second {
+		if time.Since(lastReport) >= cfg.ReportInterval {
 			for name, metric := range metrics {
-				err := agent.SendGauge(*agentURL, name, metric)
+				err := agent.SendGauge(cfg.Address, name, metric)
 				if err != nil {
 					log.Println(err)
 				}
 			}
 
-			err := agent.SendCounter(*agentURL, "PollCount", pollCount-lastSentPollCount)
+			err := agent.SendCounter(cfg.Address, "PollCount", pollCount-lastSentPollCount)
 			if err != nil {
 				log.Println(err)
 			} else {
@@ -83,9 +86,6 @@ func main() {
 			lastReport = time.Now()
 
 		}
-
-		fmt.Println(metrics)
-		fmt.Println(pollCount)
 
 		time.Sleep(time.Second)
 	}

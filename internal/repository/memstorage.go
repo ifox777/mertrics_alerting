@@ -18,14 +18,6 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-type Storage interface {
-	SetGauge(id string, value float64)
-	AddCounter(id string, delta int64)
-	GetGauge(id string) (float64, bool)
-	GetCounter(id string) (int64, bool)
-	GetAll() (map[string]float64, map[string]int64)
-}
-
 func (m *MemStorage) SetGauge(id string, value float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -41,8 +33,8 @@ func (m *MemStorage) AddCounter(id string, delta int64) {
 func (m *MemStorage) GetGauge(id string) (float64, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	value, bool := m.gauges[id]
-	return value, bool
+	value, ok := m.gauges[id]
+	return value, ok
 }
 
 func (m *MemStorage) GetCounter(id string) (int64, bool) {

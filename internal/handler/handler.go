@@ -1,15 +1,17 @@
 package handler
 
-import (
-	"github.com/ifox777/metrics-alerting/internal/repository"
-)
-
-type Handler struct {
-	storage repository.Storage
+type MetricsService interface {
+	Update(kind, name, rawValue string) error
+	Value(kind, name string) (string, error)
+	GetAll() (map[string]float64, map[string]int64)
 }
 
-func NewHandler(storage repository.Storage) *Handler {
+type Handler struct {
+	metrics MetricsService
+}
+
+func NewHandler(metrics MetricsService) *Handler {
 	return &Handler{
-		storage: storage,
+		metrics: metrics,
 	}
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"html/template"
+	"log"
 	"net/http"
 )
 
@@ -31,12 +32,7 @@ type pageData struct {
 }
 
 func (h *Handler) ListHandler(resp http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		http.Error(resp, "Incorrect method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	gauses, counters := h.storage.GetAll()
+	gauses, counters := h.metrics.GetAll()
 
 	data := pageData{
 		Gauges:   gauses,
@@ -44,14 +40,16 @@ func (h *Handler) ListHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 	tmpl, err := template.New("metrics").Parse(page)
 	if err != nil {
-		http.Error(resp, "Template error", http.StatusInternalServerError)
+		log.Printf("parse metrics template %v", err)
+		http.Error(resp, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	var buffer bytes.Buffer
 
 	err = tmpl.Execute(&buffer, data)
 	if err != nil {
-		http.Error(resp, "Template error", http.StatusInternalServerError)
+		log.Printf("execute metrics template %v", err)
+		http.Error(resp, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
