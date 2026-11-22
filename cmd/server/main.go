@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,8 +14,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/ifox777/metrics-alerting/internal/config"
 	"github.com/ifox777/metrics-alerting/internal/handler"
+	"github.com/ifox777/metrics-alerting/internal/middleware"
 	"github.com/ifox777/metrics-alerting/internal/repository"
 	"github.com/ifox777/metrics-alerting/internal/service"
+	"go.uber.org/zap"
 )
 
 func run(cfg config.ServerConfig) error {
@@ -25,7 +28,16 @@ func run(cfg config.ServerConfig) error {
 		syscall.SIGTERM,
 	)
 	defer stop()
+	logConfig := zap.NewProductionConfig()
+	logConfig.Sampling = nil
+
+	logger, err := logConfig.Build()
+	if err != nil {
+		return fmt.Errorf("create HTTP logger: %w", err)
+	}
+	defer func() { _ = logger.Sync() }()
 	r := chi.NewRouter()
+	r.Use(middleware.RequestLogger(logger))
 
 	storage := repository.NewMemStorage()
 	metrics := service.NewMetrics(storage)
