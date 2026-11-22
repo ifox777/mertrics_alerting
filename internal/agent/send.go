@@ -1,36 +1,60 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
+
+	models "github.com/ifox777/metrics-alerting/internal/model"
 )
 
-func SendGauge(url string, name string, gauge float64) error {
-	path := fmt.Sprintf("http://%s/update/gauge/%s/%g", url, name, gauge)
+func SendGauge(address, name string, gauge float64) error {
+	metric := models.Metrics{
+		ID:    name,
+		MType: models.Gauge,
+		Value: &gauge,
+	}
 
-	resp, err := http.Post(path, "text/plain", nil)
+	data, err := json.Marshal(metric)
 	if err != nil {
-		return fmt.Errorf("send gauge %s to %s: %w", name, url, err)
+		return fmt.Errorf("encode gauge %s: %w", name, err)
 	}
 
+	endpoint := "http://" + address + "/update"
+	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("send gauge %s to %s: %w", name, address, err)
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("send gauge %s to %s: unexpected HTTP status %d", name, url, resp.StatusCode)
-	}
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("send gauge %s to %s: unexpected HTTP status %d", name, address, resp.StatusCode)
+	}
 	return nil
 }
 
-func SendCounter(url string, name string, counter int64) error {
-	path := fmt.Sprintf("http://%s/update/counter/%s/%d", url, name, counter)
+func SendCounter(address, name string, delta int64) error {
+	metric := models.Metrics{
+		ID:    name,
+		MType: models.Counter,
+		Delta: &delta,
+	}
 
-	resp, err := http.Post(path, "text/plain", nil)
+	data, err := json.Marshal(metric)
 	if err != nil {
-		return fmt.Errorf("send counter %s to %s: %w", name, url, err)
+		return fmt.Errorf("encode counter %s: %w", name, err)
+	}
+
+	endpoint := "http://" + address + "/update"
+	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("send counter %s to %s: %w", name, address, err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("send counter %s to %s: unexpected HTTP status %d", name, url, resp.StatusCode)
+		return fmt.Errorf("send counter %s to %s: unexpected HTTP status %d", name, address, resp.StatusCode)
 	}
 	return nil
 }

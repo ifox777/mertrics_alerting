@@ -44,6 +44,10 @@ func run(cfg config.ServerConfig) error {
 	handler := handler.NewHandler(metrics)
 
 	r.Post("/update/*", handler.UpdateHandler)
+	r.Post("/update", handler.UpdateJSONHandler)
+	r.Post("/value", handler.ValueJSONHandler)
+	r.Post("/update/", handler.UpdateJSONHandler)
+	r.Post("/value/", handler.ValueJSONHandler)
 	r.Get("/value/{type}/{name}", handler.ValueHandler)
 	r.Get("/", handler.ListHandler)
 
