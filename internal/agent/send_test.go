@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"compress/gzip"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -181,8 +182,15 @@ func checkMetricRequest(t *testing.T, r *http.Request, wantJSON string) {
 	assert.Equal(t, http.MethodPost, r.Method)
 	assert.Equal(t, "/update", r.URL.Path)
 	assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+	assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
 
-	body, err := io.ReadAll(r.Body)
+	reader, err := gzip.NewReader(r.Body)
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer reader.Close()
+
+	body, err := io.ReadAll(reader)
 	if assert.NoError(t, err) {
 		assert.JSONEq(t, wantJSON, string(body))
 	}

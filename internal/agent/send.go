@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,51 +11,49 @@ import (
 )
 
 func SendGauge(address, name string, gauge float64) error {
-	metric := models.Metrics{
+	return sendMetric(address, models.Metrics{
 		ID:    name,
 		MType: models.Gauge,
 		Value: &gauge,
-	}
-
-	data, err := json.Marshal(metric)
-	if err != nil {
-		return fmt.Errorf("encode gauge %s: %w", name, err)
-	}
-
-	endpoint := "http://" + address + "/update"
-	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("send gauge %s to %s: %w", name, address, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("send gauge %s to %s: unexpected HTTP status %d", name, address, resp.StatusCode)
-	}
-	return nil
+	})
 }
 
 func SendCounter(address, name string, delta int64) error {
-	metric := models.Metrics{
+	return sendMetric(address, models.Metrics{
 		ID:    name,
 		MType: models.Counter,
 		Delta: &delta,
-	}
+	})
+}
 
-	data, err := json.Marshal(metric)
-	if err != nil {
-		return fmt.Errorf("encode counter %s: %w", name, err)
+func sendMetric(address string, metric models.Metrics) error {
+	var body bytes.Buffer
+	gz := gzip.NewWriter(&body)
+
+	if err := json.NewEncoder(gz).Encode(metric); err != nil {
+		return fmt.Errorf("encode %s %s: %w", metric.MType, metric.ID, err)
+	}
+	if err := gz.Close(); err != nil {
+		return fmt.Errorf("finish gzip: %w", err)
 	}
 
 	endpoint := "http://" + address + "/update"
-	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(data))
+	req, err := http.NewRequest(http.MethodPost, endpoint, &body)
 	if err != nil {
-		return fmt.Errorf("send counter %s to %s: %w", name, address, err)
+		return fmt.Errorf("send %s %s to %s: %w", metric.MType, metric.ID, address, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send %s %s to %s: %w", metric.MType, metric.ID, address, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("send counter %s to %s: unexpected HTTP status %d", name, address, resp.StatusCode)
+		return fmt.Errorf("send %s %s to %s: unexpected HTTP status %d",
+			metric.MType, metric.ID, address, resp.StatusCode)
 	}
 	return nil
 }

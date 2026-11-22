@@ -18,6 +18,7 @@ import (
 	"github.com/ifox777/metrics-alerting/internal/repository"
 	"github.com/ifox777/metrics-alerting/internal/service"
 	"go.uber.org/zap"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
 
 func run(cfg config.ServerConfig) error {
@@ -38,6 +39,8 @@ func run(cfg config.ServerConfig) error {
 	defer func() { _ = logger.Sync() }()
 	r := chi.NewRouter()
 	r.Use(middleware.RequestLogger(logger))
+	r.Use(chimiddleware.Compress(5, "application/json", "text/html"))
+	r.Use(middleware.DecompressRequest)
 
 	storage := repository.NewMemStorage()
 	metrics := service.NewMetrics(storage)
