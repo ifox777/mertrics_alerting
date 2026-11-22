@@ -2,6 +2,9 @@ package config
 
 import (
 	"flag"
+	"fmt"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -25,9 +28,14 @@ func ParseServer(args []string) (ServerConfig, error) {
 		return ServerConfig{}, err
 	}
 
-	return ServerConfig{
-		Address: *address,
-	}, nil
+	cfg := ServerConfig{Address: *address}
+
+	envAddress, ok := os.LookupEnv("ADDRESS")
+	if ok {
+		cfg.Address = envAddress
+	}
+
+	return cfg, nil
 }
 
 func ParseAgent(args []string) (AgentConfig, error) {
@@ -41,9 +49,36 @@ func ParseAgent(args []string) (AgentConfig, error) {
 	if err != nil {
 		return AgentConfig{}, err
 	}
-	return AgentConfig{
+
+	cfg := AgentConfig{
 		Address:        *address,
 		ReportInterval: time.Duration(*reportInterval) * time.Second,
 		PollInterval:   time.Duration(*pollinterval) * time.Second,
-	}, nil
+	}
+
+	envAddress, ok := os.LookupEnv("ADDRESS")
+	if ok {
+		cfg.Address = envAddress
+	}
+
+	envReportInterval, ok := os.LookupEnv("REPORT_INTERVAL")
+	if ok {
+		seconds, err := strconv.Atoi(envReportInterval)
+		if err != nil {
+			return AgentConfig{}, fmt.Errorf("parse REPORT_INTERVAL: %w", err)
+		}
+		cfg.ReportInterval = time.Duration(seconds) * time.Second
+	}
+
+	envPollInterval, ok := os.LookupEnv("POLL_INTERVAL")
+	if ok {
+		seconds, err := strconv.Atoi(envPollInterval)
+		if err != nil {
+			return AgentConfig{}, fmt.Errorf("parse POLL_INTERVAL: %w", err)
+		}
+		cfg.PollInterval = time.Duration(seconds) * time.Second
+
+	}
+
+	return cfg, nil
 }

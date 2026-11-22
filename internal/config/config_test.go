@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"flag"
+	"os"
 	"testing"
 	"time"
 
@@ -9,7 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func clearConfigEnv(t *testing.T) {
+	t.Helper()
+
+	for _, key := range []string{"ADDRESS", "REPORT_INTERVAL", "POLL_INTERVAL"} {
+		t.Setenv(key, "")
+		require.NoError(t, os.Unsetenv(key))
+	}
+}
+
 func TestParseServer(t *testing.T) {
+	clearConfigEnv(t)
 	tests := []struct {
 		name    string
 		args    []string
@@ -55,6 +66,8 @@ func TestParseServer(t *testing.T) {
 }
 
 func TestParseAgent(t *testing.T) {
+	clearConfigEnv(t)
+
 	tests := []struct {
 		name    string
 		args    []string
@@ -133,6 +146,7 @@ func TestParseAgent(t *testing.T) {
 }
 
 func TestParseHelp(t *testing.T) {
+	clearConfigEnv(t)
 	parsers := []struct {
 		name  string
 		parse func([]string) error
@@ -166,6 +180,7 @@ func TestParseHelp(t *testing.T) {
 }
 
 func TestParseServerRepeatedCalls(t *testing.T) {
+	clearConfigEnv(t)
 	first, err := config.ParseServer([]string{"-a", "localhost:9090"})
 	require.NoError(t, err)
 	require.Equal(t, config.ServerConfig{Address: "localhost:9090"}, first)
@@ -185,6 +200,7 @@ func TestParseServerRepeatedCalls(t *testing.T) {
 }
 
 func TestParseAgentRepeatedCalls(t *testing.T) {
+	clearConfigEnv(t)
 	first, err := config.ParseAgent([]string{"-a", "localhost:9090", "-r", "7", "-p", "3"})
 	require.NoError(t, err)
 	require.Equal(t, config.AgentConfig{
@@ -211,6 +227,7 @@ func TestParseAgentRepeatedCalls(t *testing.T) {
 }
 
 func TestParsersIndependent(t *testing.T) {
+	clearConfigEnv(t)
 	agent, err := config.ParseAgent([]string{"-a", "localhost:9090", "-r", "7", "-p", "3"})
 	require.NoError(t, err)
 	require.Equal(t, config.AgentConfig{
@@ -233,4 +250,22 @@ func TestParsersIndependent(t *testing.T) {
 	serverDefaults, err := config.ParseServer(nil)
 	require.NoError(t, err)
 	require.Equal(t, config.ServerConfig{Address: "localhost:8080"}, serverDefaults)
+}
+
+func TestEnvOverridesFlags(t *testing.T) {
+	t.Setenv("ADDRESS", "localhost:9090")
+	t.Setenv("REPORT_INTERVAL", "7")
+	t.Setenv("POLL_INTERVAL", "4")
+
+	server, err := config.ParseServer([]string{"-a", "localhost:8081"})
+	require.NoError(t, err)
+	require.Equal(t, "localhost:9090", server.Address)
+
+	agent, err := config.ParseAgent([]string{"-a", "localhost:8081", "-r", "11", "-p", "3"})
+	require.NoError(t, err)
+	require.Equal(t, config.AgentConfig{
+		Address:        "localhost:9090",
+		ReportInterval: 7 * time.Second,
+		PollInterval:   4 * time.Second,
+	}, agent)
 }
