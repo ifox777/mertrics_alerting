@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -21,6 +22,9 @@ func (m *Metrics) Update(kind, name, rawValue string) error {
 		gauge, err := strconv.ParseFloat(rawValue, 64)
 		if err != nil {
 			return err
+		}
+		if math.IsNaN(gauge) || math.IsInf(gauge, 0) {
+			return fmt.Errorf("gauge %q must be finite", name)
 		}
 		m.storage.SetGauge(name, gauge)
 	case "counter":

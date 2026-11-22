@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"mime"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	models "github.com/ifox777/metrics-alerting/internal/model"
+	"github.com/ifox777/metrics-alerting/internal/repository"
 )
 
 func (h *Handler) UpdateHandler(resp http.ResponseWriter, req *http.Request) {
@@ -30,6 +32,11 @@ func (h *Handler) UpdateHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	if err := h.metrics.Update(parts[2], parts[3], parts[4]); err != nil {
+		if errors.Is(err, repository.ErrSaveSnapshot) {
+			log.Printf("save metric: %v", err)
+			http.Error(resp, "could not save metric", http.StatusInternalServerError)
+			return
+		}
 		http.Error(resp, err.Error(), http.StatusBadRequest)
 		return
 	}

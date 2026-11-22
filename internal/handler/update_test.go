@@ -60,6 +60,9 @@ func TestUpdateHandler(t *testing.T) {
 		{"неправильный запрос 3", "POST", "/update/gauge//21.5", 404, storageSpy{}},
 		{"неправильный запрос 4", "POST", "/update/unknown/temperature/1", 400, storageSpy{}},
 		{"неправильный запрос 5", "POST", "/update/gauge/temperature/abc", 400, storageSpy{}},
+		{"gauge NaN", "POST", "/update/gauge/temperature/NaN", 400, storageSpy{}},
+		{"gauge positive infinity", "POST", "/update/gauge/temperature/+Inf", 400, storageSpy{}},
+		{"gauge negative infinity", "POST", "/update/gauge/temperature/-Inf", 400, storageSpy{}},
 		{"неправильный запрос 6", "POST", "/update/counter/PollCount/1.5", 400, storageSpy{}},
 		{"неправильный запрос 7", "POST", "/update/gauge/temperature/", 400, storageSpy{}},
 	}

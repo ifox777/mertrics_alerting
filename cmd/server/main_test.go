@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -95,6 +96,7 @@ func startServerProcess(t *testing.T, address string) *serverProcess {
 	process.cmd.Env = append(os.Environ(),
 		serverHelperEnv+"=1",
 		serverAddressEnv+"="+address,
+		"FILE_STORAGE_PATH="+filepath.Join(t.TempDir(), "metrics.json"),
 	)
 
 	process.cmd.Stdout = &process.output
