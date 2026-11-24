@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 
@@ -97,24 +96,11 @@ func (m *MemStorage) LoadFromFile(path string) error {
 var ErrSaveSnapshot = errors.New("save metrics snapshot")
 
 func (m *MemStorage) UpdateAndSave(path string, update func(*MemStorage) error) error {
-	m.saveMu.Lock()
-	defer m.saveMu.Unlock()
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	next := &MemStorage{
-		gauges:   maps.Clone(m.gauges),
-		counters: maps.Clone(m.counters),
-	}
-
-	if err := update(next); err != nil {
+	if err := update(m); err != nil {
 		return err
 	}
-	if err := next.SaveToFile(path); err != nil {
+	if err := m.SaveToFile(path); err != nil {
 		return fmt.Errorf("%w: %w", ErrSaveSnapshot, err)
 	}
-
-	m.gauges, m.counters = next.gauges, next.counters
 	return nil
 }

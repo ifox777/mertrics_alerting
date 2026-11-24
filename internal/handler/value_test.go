@@ -91,3 +91,22 @@ func TestValueJSONHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateJSONHandlerCounter(t *testing.T) {
+	storage := repository.NewMemStorage()
+	storage.AddCounter("PollCount", 10)
+	h := NewHandler(service.NewMetrics(storage))
+
+	body := strings.NewReader(`{"id":"PollCount","type":"counter","delta":5}`)
+	req := httptest.NewRequest(http.MethodPost, "/update", body)
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+
+	h.UpdateJSONHandler(resp, req)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.JSONEq(t,
+		`{"id":"PollCount","type":"counter","delta":15}`,
+		resp.Body.String(),
+	)
+}

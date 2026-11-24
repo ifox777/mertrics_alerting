@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	models "github.com/ifox777/metrics-alerting/internal/model"
 )
@@ -37,7 +38,10 @@ func sendMetric(address string, metric models.Metrics) error {
 		return fmt.Errorf("finish gzip: %w", err)
 	}
 
-	endpoint := "http://" + address + "/update"
+	endpoint, err := url.JoinPath("http://"+address, "/update")
+	if err != nil {
+		return fmt.Errorf("build update URL for %q: %w", address, err)
+	}
 	req, err := http.NewRequest(http.MethodPost, endpoint, &body)
 	if err != nil {
 		return fmt.Errorf("send %s %s to %s: %w", metric.MType, metric.ID, address, err)

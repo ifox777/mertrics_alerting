@@ -81,6 +81,20 @@ func (h *Handler) UpdateJSONHandler(resp http.ResponseWriter, req *http.Request)
 		writeJSONError(resp, http.StatusInternalServerError, "could not update metric")
 		return
 	}
+
+	if metric.MType == models.Counter {
+		raw, err := h.metrics.Value(metric.MType, metric.ID)
+		if err != nil {
+			writeJSONError(resp, http.StatusInternalServerError, "could not read counter")
+			return
+		}
+		total, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			writeJSONError(resp, http.StatusInternalServerError, "invalid stored counter")
+			return
+		}
+		metric.Delta = &total
+	}
 	if err := json.NewEncoder(resp).Encode(metric); err != nil {
 		log.Printf("write metric response: %v", err)
 	}
