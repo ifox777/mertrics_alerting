@@ -7,6 +7,7 @@ import (
 
 type MemStorage struct {
 	mu       sync.Mutex
+	saveMu   sync.Mutex
 	gauges   map[string]float64
 	counters map[string]int64
 }

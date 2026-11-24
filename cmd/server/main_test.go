@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -95,6 +96,7 @@ func startServerProcess(t *testing.T, address string) *serverProcess {
 	process.cmd.Env = append(os.Environ(),
 		serverHelperEnv+"=1",
 		serverAddressEnv+"="+address,
+		"FILE_STORAGE_PATH="+filepath.Join(t.TempDir(), "metrics.json"),
 	)
 
 	process.cmd.Stdout = &process.output
@@ -170,4 +172,29 @@ func waitForServer(t *testing.T, process *serverProcess, address string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("server did not become ready before the deadline")
+}
+
+func TestUpdateJSONZeroGauge(t *testing.T) {
+	address := unusedServerAddress(t)
+	t.Setenv("ADDRESS", address)
+	process := startServerProcess(t, address)
+	waitForServer(t, process, address)
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	baseURL := "http://" + address
+	body := strings.NewReader(`{"id":"Alloc","type":"gauge","value":0}`)
+
+	post, err := client.Post(baseURL+"/update", "application/json", body)
+	require.NoError(t, err)
+	defer post.Body.Close()
+	require.Equal(t, http.StatusOK, post.StatusCode)
+	require.Contains(t, post.Header.Get("Content-Type"), "application/json")
+
+	get, err := client.Get(baseURL + "/value/gauge/Alloc")
+	require.NoError(t, err)
+	defer get.Body.Close()
+	require.Equal(t, http.StatusOK, get.StatusCode)
+	value, err := io.ReadAll(get.Body)
+	require.NoError(t, err)
+	require.Equal(t, "0", string(value))
 }

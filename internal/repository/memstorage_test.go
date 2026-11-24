@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -96,4 +98,33 @@ func TestMemStorage_GetAll(t *testing.T) {
 	assert.True(t, counterExists)
 	assert.Equal(t, 21.5, gaugeValue)
 	assert.Equal(t, int64(5), counterValue)
+}
+
+func TestSaveToFileCounter(t *testing.T) {
+	storage := NewMemStorage()
+	storage.AddCounter("PollCount", 2)
+	storage.AddCounter("PollCount", 3)
+
+	path := filepath.Join(t.TempDir(), "metrics.json")
+	require.NoError(t, storage.SaveToFile(path))
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `[{"id":"PollCount","type":"counter","delta":5}]`, string(data))
+}
+
+func TestSaveAndLoadMetrics(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "metrics.json")
+	source := NewMemStorage()
+	source.SetGauge("Alloc", 0)
+	source.AddCounter("PollCount", 5)
+	require.NoError(t, source.SaveToFile(path))
+
+	restored := NewMemStorage()
+	require.NoError(t, restored.LoadFromFile(path))
+	require.NoError(t, restored.LoadFromFile(path))
+
+	gauges, counters := restored.GetAll()
+	require.Equal(t, map[string]float64{"Alloc": 0}, gauges)
+	require.Equal(t, map[string]int64{"PollCount": 5}, counters)
 }

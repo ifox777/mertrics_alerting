@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"compress/gzip"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -28,10 +29,8 @@ func TestSendGauge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					assert.Equal(t, http.MethodPost, r.Method)
-					assert.Equal(t, r.URL.Path, "/update/gauge/Alloc/21.5")
-					assert.Equal(t, r.Header.Get("Content-Type"), "text/plain")
-
+					checkMetricRequest(t, r, `{"id":"Alloc","type":"gauge","value":21.5}`)
+					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(tt.status)
 				}))
 
@@ -64,10 +63,8 @@ func TestSendCounter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					assert.Equal(t, http.MethodPost, r.Method)
-					assert.Equal(t, r.URL.Path, "/update/counter/Alloc/2")
-					assert.Equal(t, r.Header.Get("Content-Type"), "text/plain")
-
+					checkMetricRequest(t, r, `{"id":"Alloc","type":"counter","delta":2}`)
+					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(tt.status)
 				}))
 			defer server.Close()
@@ -176,5 +173,25 @@ func TestSendClosesResponseBody(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func checkMetricRequest(t *testing.T, r *http.Request, wantJSON string) {
+	t.Helper()
+
+	assert.Equal(t, http.MethodPost, r.Method)
+	assert.Equal(t, "/update", r.URL.Path)
+	assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+	assert.Equal(t, "gzip", r.Header.Get("Content-Encoding"))
+
+	reader, err := gzip.NewReader(r.Body)
+	if !assert.NoError(t, err) {
+		return
+	}
+	defer reader.Close()
+
+	body, err := io.ReadAll(reader)
+	if assert.NoError(t, err) {
+		assert.JSONEq(t, wantJSON, string(body))
 	}
 }

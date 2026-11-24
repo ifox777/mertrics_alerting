@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"flag"
+	"os"
 	"testing"
 	"time"
 
@@ -9,7 +10,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func clearConfigEnv(t *testing.T) {
+	t.Helper()
+
+	for _, key := range []string{"ADDRESS", "REPORT_INTERVAL", "POLL_INTERVAL", "STORE_INTERVAL", "FILE_STORAGE_PATH", "RESTORE"} {
+		t.Setenv(key, "")
+		require.NoError(t, os.Unsetenv(key))
+	}
+}
+
+func wantServerConfig(address string) config.ServerConfig {
+	return config.ServerConfig{
+		Address:         address,
+		StoreInterval:   300 * time.Second,
+		FileStoragePath: "metrics.json",
+		Restore:         true,
+	}
+}
+
 func TestParseServer(t *testing.T) {
+	clearConfigEnv(t)
 	tests := []struct {
 		name    string
 		args    []string
@@ -18,25 +38,25 @@ func TestParseServer(t *testing.T) {
 	}{
 		{
 			name: "defaults with nil arguments",
-			want: config.ServerConfig{Address: "localhost:8080"},
+			want: wantServerConfig("localhost:8080"),
 		},
 		{
 			name: "defaults with empty arguments",
 			args: []string{},
-			want: config.ServerConfig{Address: "localhost:8080"},
+			want: wantServerConfig("localhost:8080"),
 		},
 		{
 			name: "custom address",
 			args: []string{"-a", "localhost:9090"},
-			want: config.ServerConfig{Address: "localhost:9090"},
+			want: wantServerConfig("localhost:9090"),
 		},
 		{
 			name: "address with equals sign",
 			args: []string{"-a=127.0.0.1:9091"},
-			want: config.ServerConfig{Address: "127.0.0.1:9091"},
+			want: wantServerConfig("127.0.0.1:9091"),
 		},
 		{name: "unknown flag", args: []string{"-unknown"}, wantErr: true},
-		{name: "report flag belongs to agent", args: []string{"-r", "3"}, wantErr: true},
+		{name: "invalid restore flag value", args: []string{"-r=3"}, wantErr: true},
 		{name: "poll flag belongs to agent", args: []string{"-p", "1"}, wantErr: true},
 		{name: "missing address", args: []string{"-a"}, wantErr: true},
 	}
@@ -55,6 +75,8 @@ func TestParseServer(t *testing.T) {
 }
 
 func TestParseAgent(t *testing.T) {
+	clearConfigEnv(t)
+
 	tests := []struct {
 		name    string
 		args    []string
@@ -133,6 +155,7 @@ func TestParseAgent(t *testing.T) {
 }
 
 func TestParseHelp(t *testing.T) {
+	clearConfigEnv(t)
 	parsers := []struct {
 		name  string
 		parse func([]string) error
@@ -166,25 +189,27 @@ func TestParseHelp(t *testing.T) {
 }
 
 func TestParseServerRepeatedCalls(t *testing.T) {
+	clearConfigEnv(t)
 	first, err := config.ParseServer([]string{"-a", "localhost:9090"})
 	require.NoError(t, err)
-	require.Equal(t, config.ServerConfig{Address: "localhost:9090"}, first)
+	require.Equal(t, wantServerConfig("localhost:9090"), first)
 
 	defaults, err := config.ParseServer(nil)
 	require.NoError(t, err)
-	require.Equal(t, config.ServerConfig{Address: "localhost:8080"}, defaults)
+	require.Equal(t, wantServerConfig("localhost:8080"), defaults)
 
 	_, err = config.ParseServer([]string{"-a", "localhost:9091", "-unknown"})
 	require.Error(t, err)
 
 	afterError, err := config.ParseServer(nil)
 	require.NoError(t, err)
-	require.Equal(t, config.ServerConfig{Address: "localhost:8080"}, afterError)
+	require.Equal(t, wantServerConfig("localhost:8080"), afterError)
 
-	require.Equal(t, config.ServerConfig{Address: "localhost:9090"}, first)
+	require.Equal(t, wantServerConfig("localhost:9090"), first)
 }
 
 func TestParseAgentRepeatedCalls(t *testing.T) {
+	clearConfigEnv(t)
 	first, err := config.ParseAgent([]string{"-a", "localhost:9090", "-r", "7", "-p", "3"})
 	require.NoError(t, err)
 	require.Equal(t, config.AgentConfig{
@@ -211,6 +236,7 @@ func TestParseAgentRepeatedCalls(t *testing.T) {
 }
 
 func TestParsersIndependent(t *testing.T) {
+	clearConfigEnv(t)
 	agent, err := config.ParseAgent([]string{"-a", "localhost:9090", "-r", "7", "-p", "3"})
 	require.NoError(t, err)
 	require.Equal(t, config.AgentConfig{
@@ -219,9 +245,9 @@ func TestParsersIndependent(t *testing.T) {
 
 	server, err := config.ParseServer([]string{"-a", "localhost:9091"})
 	require.NoError(t, err)
-	require.Equal(t, config.ServerConfig{Address: "localhost:9091"}, server)
+	require.Equal(t, wantServerConfig("localhost:9091"), server)
 
-	_, err = config.ParseServer([]string{"-r", "5"})
+	_, err = config.ParseServer([]string{"-p", "5"})
 	require.Error(t, err)
 
 	agentDefaults, err := config.ParseAgent(nil)
@@ -232,5 +258,92 @@ func TestParsersIndependent(t *testing.T) {
 
 	serverDefaults, err := config.ParseServer(nil)
 	require.NoError(t, err)
-	require.Equal(t, config.ServerConfig{Address: "localhost:8080"}, serverDefaults)
+	require.Equal(t, wantServerConfig("localhost:8080"), serverDefaults)
+}
+
+func TestEnvOverridesFlags(t *testing.T) {
+	clearConfigEnv(t)
+	t.Setenv("ADDRESS", "localhost:9090")
+	t.Setenv("REPORT_INTERVAL", "7")
+	t.Setenv("POLL_INTERVAL", "4")
+
+	server, err := config.ParseServer([]string{"-a", "localhost:8081"})
+	require.NoError(t, err)
+	require.Equal(t, "localhost:9090", server.Address)
+
+	agent, err := config.ParseAgent([]string{"-a", "localhost:8081", "-r", "11", "-p", "3"})
+	require.NoError(t, err)
+	require.Equal(t, config.AgentConfig{
+		Address:        "localhost:9090",
+		ReportInterval: 7 * time.Second,
+		PollInterval:   4 * time.Second,
+	}, agent)
+}
+
+func TestParseServerStoreInterval(t *testing.T) {
+	clearConfigEnv(t)
+
+	cfg, err := config.ParseServer(nil)
+	require.NoError(t, err)
+	require.Equal(t, 300*time.Second, cfg.StoreInterval)
+
+	cfg, err = config.ParseServer([]string{"-i", "15"})
+	require.NoError(t, err)
+	require.Equal(t, 15*time.Second, cfg.StoreInterval)
+
+	t.Setenv("STORE_INTERVAL", "0")
+	cfg, err = config.ParseServer([]string{"-i", "15"})
+	require.NoError(t, err)
+	require.Equal(t, time.Duration(0), cfg.StoreInterval)
+}
+
+func TestParseServerFileStoragePath(t *testing.T) {
+	clearConfigEnv(t)
+
+	cfg, err := config.ParseServer(nil)
+	require.NoError(t, err)
+	require.Equal(t, "metrics.json", cfg.FileStoragePath)
+
+	args := []string{"-f", "from-flag.json"}
+	cfg, err = config.ParseServer(args)
+	require.NoError(t, err)
+	require.Equal(t, "from-flag.json", cfg.FileStoragePath)
+
+	t.Setenv("FILE_STORAGE_PATH", "from-env.json")
+	cfg, err = config.ParseServer(args)
+	require.NoError(t, err)
+	require.Equal(t, "from-env.json", cfg.FileStoragePath)
+}
+
+func TestParseServerRestore(t *testing.T) {
+	clearConfigEnv(t)
+
+	tests := []struct {
+		name    string
+		arg     string
+		env     string
+		want    bool
+		wantErr bool
+	}{
+		{name: "flag disables restore", arg: "-r=false", want: false},
+		{name: "bare flag enables restore", arg: "-r", want: true},
+		{name: "environment disables restore", arg: "-r=true", env: "false", want: false},
+		{name: "environment enables restore", arg: "-r=false", env: "true", want: true},
+		{name: "invalid environment value", arg: "-r=true", env: "oops", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != "" {
+				t.Setenv("RESTORE", tt.env)
+			}
+			cfg, err := config.ParseServer([]string{tt.arg})
+			if tt.wantErr {
+				require.ErrorContains(t, err, "RESTORE")
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, cfg.Restore)
+		})
+	}
 }
